@@ -29,24 +29,33 @@ netlify dev
 
 Desktop testing shortcuts: `H` / `V` flip the cut axis, `Esc` pauses.
 
-## Deploy (Netlify + Supabase)
+## Deploy (Netlify)
 
-1. **Supabase**
-   - Create a project at [supabase.com](https://supabase.com).
-   - In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql).
-   - Copy **Project URL** and **service_role** key (Settings → API).
+Live site: https://plasma-cut.netlify.app  
+Repo: https://github.com/rp779/plasma-cut
 
-2. **Netlify**
-   - Connect this GitHub repo (`plasma-cut`) as a new site.
-   - Publish directory: `.` (from `netlify.toml`).
-   - Set environment variables:
-     - `SUPABASE_URL`
-     - `SUPABASE_SERVICE_ROLE_KEY`
-   - Deploy. Confirm `/.netlify/functions/leaderboard` returns JSON.
+Scores work out of the box on Netlify via **Netlify Blobs**. Optionally point the
+same API at **Supabase** (recommended before iOS auth) by setting env vars.
 
-3. **Smoke test**
-   - Play → clear a level → enter a nickname → **SUBMIT SCORE**.
-   - Open **SCORES** on the title screen and confirm the entry appears.
+### Netlify
+
+- Publish directory: `.` (from `netlify.toml`)
+- Functions: `netlify/functions`
+- Optional env vars (switch storage to Supabase):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+
+### Supabase (optional)
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql).
+3. Set the two env vars above on the Netlify site and redeploy.
+
+### Smoke test
+
+1. Open the site → play → clear a level → enter a nickname → **SUBMIT SCORE**.
+2. Open **SCORES** on the title screen and confirm the entry appears.
+3. `GET /.netlify/functions/leaderboard` should return JSON `{ "scores": [...] }`.
 
 ## Leaderboard rules
 

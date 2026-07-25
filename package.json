@@ -1,0 +1,8 @@
+{
+  "name": "plasma-cut",
+  "private": true,
+  "description": "Plasma Cut — JezzBall-style containment game",
+  "dependencies": {
+    "@netlify/blobs": "^9.1.2"
+  }
+}

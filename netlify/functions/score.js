@@ -1,8 +1,7 @@
 'use strict';
 
-var shared = require('./_shared');
-
-var RATE_LIMIT_MS = 5000;
+var shared = require('../lib/shared');
+var store = require('../lib/store');
 
 exports.handler = async function (event) {
   if (event.httpMethod === 'OPTIONS') {
@@ -10,11 +9,6 @@ exports.handler = async function (event) {
   }
   if (event.httpMethod !== 'POST') {
     return shared.json(405, { error: 'Method not allowed' });
-  }
-
-  var cfg = shared.supabaseConfig();
-  if (!cfg) {
-    return shared.json(500, { error: 'Leaderboard is not configured.' });
   }
 
   var body;
@@ -29,65 +23,18 @@ exports.handler = async function (event) {
     return shared.json(400, { error: parsed.error });
   }
 
-  var nickname = parsed.nickname;
-  var score = parsed.score;
-  var level = parsed.level;
-
   try {
-    var getUrl = cfg.url + '/rest/v1/scores?nickname=eq.' + encodeURIComponent(nickname) +
-      '&select=nickname,score,level,updated_at';
-    var existingRes = await fetch(getUrl, {
-      headers: shared.supabaseHeaders(cfg.key)
-    });
-    if (!existingRes.ok) {
-      var existingErr = await existingRes.text();
-      return shared.json(502, { error: 'Failed to check existing score.', detail: existingErr });
-    }
-    var existingRows = await existingRes.json();
-    var existing = existingRows[0];
-
-    if (existing) {
-      var updatedAt = Date.parse(existing.updated_at);
-      if (!Number.isNaN(updatedAt) && Date.now() - updatedAt < RATE_LIMIT_MS) {
-        return shared.json(429, { error: 'Slow down — try again in a few seconds.' });
-      }
-      if (existing.score >= score) {
-        return shared.json(200, {
-          ok: true,
-          updated: false,
-          message: 'Existing best is higher or equal.',
-          entry: existing
-        });
-      }
-    }
-
-    var payload = {
-      nickname: nickname,
-      score: score,
-      level: level,
-      updated_at: new Date().toISOString()
-    };
-
-    var writeRes = await fetch(cfg.url + '/rest/v1/scores', {
-      method: 'POST',
-      headers: shared.supabaseHeaders(cfg.key, {
-        Prefer: 'resolution=merge-duplicates,return=representation'
-      }),
-      body: JSON.stringify(payload)
-    });
-
-    if (!writeRes.ok) {
-      var writeErr = await writeRes.text();
-      return shared.json(502, { error: 'Failed to save score.', detail: writeErr });
-    }
-
-    var saved = await writeRes.json();
+    var result = await store.upsertScore(parsed.nickname, parsed.score, parsed.level);
     return shared.json(200, {
       ok: true,
-      updated: true,
-      entry: Array.isArray(saved) ? saved[0] : saved
+      updated: result.updated,
+      message: result.updated ? undefined : 'Existing best is higher or equal.',
+      entry: result.entry
     });
   } catch (err) {
-    return shared.json(500, { error: 'Failed to save score.' });
+    return shared.json(err.statusCode || 500, {
+      error: err.message || 'Failed to save score.',
+      detail: err.detail
+    });
   }
 };

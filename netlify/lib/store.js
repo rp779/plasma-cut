@@ -82,7 +82,7 @@ async function upsertSupabase(cfg, nickname, score, level) {
 }
 
 async function getBlobStore() {
-  var blobs = require('@netlify/blobs');
+  var blobs = await import('@netlify/blobs');
   return blobs.getStore('plasma-cut-scores');
 }
 

@@ -89,25 +89,48 @@ async function getBlobStore(event) {
   return blobs.getStore('plasma-cut-scores');
 }
 
-async function readBlobMap(store) {
-  var data = await store.get('all', { type: 'json' });
-  return data && data.scores ? data.scores : {};
+function nickKey(nickname) {
+  return 'nick:' + nickname.toLowerCase();
 }
 
 async function listBlobs(event) {
   var store = await getBlobStore(event);
-  var map = await readBlobMap(store);
-  return Object.keys(map)
-    .map(function (k) { return map[k]; })
-    .sort(function (a, b) { return b.score - a.score || a.nickname.localeCompare(b.nickname); })
-    .slice(0, 50);
+  var listed = await store.list();
+  var keys = (listed && listed.blobs ? listed.blobs : [])
+    .map(function (b) { return b.key; })
+    .filter(function (k) { return k.indexOf('nick:') === 0; });
+
+  // Migrate legacy single-document store if present
+  if (!keys.length) {
+    var legacy = await store.get('all', { type: 'json' });
+    if (legacy && legacy.scores) {
+      var legacyKeys = Object.keys(legacy.scores);
+      for (var i = 0; i < legacyKeys.length; i++) {
+        var entry = legacy.scores[legacyKeys[i]];
+        if (entry && entry.nickname) {
+          await store.setJSON(nickKey(entry.nickname), entry);
+          keys.push(nickKey(entry.nickname));
+        }
+      }
+    }
+  }
+
+  var rows = [];
+  for (var j = 0; j < keys.length; j++) {
+    var row = await store.get(keys[j], { type: 'json' });
+    if (row && typeof row.score === 'number') rows.push(row);
+  }
+
+  rows.sort(function (a, b) {
+    return b.score - a.score || String(a.nickname).localeCompare(String(b.nickname));
+  });
+  return rows.slice(0, 50);
 }
 
 async function upsertBlobs(nickname, score, level, event) {
   var store = await getBlobStore(event);
-  var map = await readBlobMap(store);
-  var key = nickname.toLowerCase();
-  var existing = map[key];
+  var key = nickKey(nickname);
+  var existing = await store.get(key, { type: 'json' });
 
   if (existing) {
     var updatedAt = Date.parse(existing.updated_at);
@@ -127,8 +150,7 @@ async function upsertBlobs(nickname, score, level, event) {
     level: level,
     updated_at: new Date().toISOString()
   };
-  map[key] = entry;
-  await store.setJSON('all', { scores: map });
+  await store.setJSON(key, entry);
   return { updated: true, entry: entry };
 }
 

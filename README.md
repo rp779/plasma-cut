@@ -2,7 +2,8 @@
 
 A JezzBall-style containment game. Portrait, touch-first, no frontend dependencies
 and no build step for the game itself — open `index.html` (via a local server) and
-it runs. The public leaderboard is served by Netlify Functions + Supabase.
+it runs. The public leaderboard is served by Netlify Functions (Netlify Blobs by
+default, or Supabase when `SUPABASE_*` env vars are set).
 
 ```
 index.html              screens & HUD markup

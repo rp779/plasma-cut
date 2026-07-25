@@ -218,9 +218,10 @@
   function layout() {
     var availW = el.app.clientWidth - 24;
     var hudH = el.hud.offsetHeight || 52;
+    var dockH = el.dock.offsetHeight || 96;
     var chromeTop = parseFloat(getComputedStyle(el.game).paddingTop) || 8;
     var chromeBot = parseFloat(getComputedStyle(el.game).paddingBottom) || 8;
-    var availH = el.app.clientHeight - hudH - chromeTop - chromeBot - 96; // 96 = axis dock
+    var availH = el.app.clientHeight - hudH - dockH - chromeTop - chromeBot - 8;
 
     var next = Math.max(6, Math.floor(Math.min(availW / COLS, availH / ROWS)));
     if (next === CELL && el.canvas.width) return;

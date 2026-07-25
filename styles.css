@@ -22,7 +22,29 @@ html, body {
   user-select: none; -webkit-user-select: none; touch-action: manipulation;
 }
 
-#app { position: relative; width: 100%; height: 100%; overflow: hidden; }
+body { display: flex; align-items: center; justify-content: center; }
+
+#app {
+  position: relative; width: 100%; height: 100%; overflow: hidden;
+  max-width: 460px; flex: 0 0 auto;
+}
+
+/* On anything wider than a phone, present the game as a centred device frame
+   instead of stretching the portrait layout across the viewport. */
+@media (min-width: 560px) {
+  body {
+    padding: 24px;
+    background:
+      radial-gradient(80% 50% at 50% 0%, rgba(46,230,246,.10), transparent 70%),
+      radial-gradient(70% 50% at 50% 100%, rgba(255,46,138,.08), transparent 70%),
+      var(--bg);
+  }
+  #app {
+    width: auto; height: 100%; max-height: 920px; min-width: 320px;
+    aspect-ratio: 9 / 19.5; border-radius: 26px;
+    box-shadow: 0 0 0 1px rgba(46,230,246,.18), 0 30px 90px rgba(0,0,0,.75);
+  }
+}
 
 .bg-wash, .bg-grid { position: absolute; inset: 0; pointer-events: none; }
 .bg-wash {
@@ -194,7 +216,10 @@ html, body {
 /* ── game ────────────────────────────────────────────── */
 .screen--game { padding: calc(var(--safe-t) + 8px) 12px calc(var(--safe-b) + 8px); align-items: center; }
 
-.hud { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 8px; padding: 6px 0 8px; }
+.hud {
+  width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 8px; padding: 6px 0 8px;
+  container-type: inline-size;
+}
 .hud-row { display: flex; align-items: center; gap: 10px; }
 .spacer { flex: 1; }
 .pips { display: flex; gap: 5px; }
@@ -216,6 +241,20 @@ html, body {
 .readout--time { min-width: 44px; }
 .readout-value { font-size: 15px; font-weight: 700; }
 
+/* Narrow frames (small phones, short desktop windows) can't fit the full HUD
+   row; the target marker on the bar still communicates the goal. */
+@container (max-width: 340px) {
+  .hud-row { gap: 6px; }
+  .pip { width: 9px; height: 9px; }
+  .chip { padding: 2px 6px; font-size: 10px; letter-spacing: .08em; }
+  .pct b { font-size: 13px; }
+  .pct span { display: none; }
+  .stat-label { font-size: 8px; }
+  .readout-value { font-size: 13px; }
+  .readout--time { min-width: 38px; }
+  .icon-btn--pause { width: 30px; height: 30px; border-radius: 9px; }
+}
+
 .bar { position: relative; height: 6px; border-radius: 4px; background: rgba(255,255,255,.07); }
 .bar-fill {
   position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 4px;
@@ -225,19 +264,21 @@ html, body {
 .bar-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--orb); box-shadow: 0 0 10px rgba(255,46,138,.9); }
 
 .field-wrap {
-  position: relative; border-radius: 10px; overflow: hidden; background: #05080f;
+  position: relative; flex: 0 0 auto; margin: auto 0;
+  border-radius: 10px; overflow: hidden; background: #05080f;
   box-shadow: inset 0 0 0 1px rgba(46,230,246,.14), 0 22px 60px rgba(0,0,0,.6);
 }
 #field { display: block; touch-action: none; }
 
-.axis-dock { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; }
+.axis-dock { flex: 0 0 auto; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding-top: 12px; }
 .axis-label { font-size: 9px; font-weight: 600; letter-spacing: .24em; color: rgba(232,246,248,.36); }
 .seg {
   display: flex; gap: 8px; padding: 5px; border-radius: 20px;
+  width: 100%; max-width: 320px;
   background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09);
 }
 .seg-btn {
-  width: 150px; height: 56px; border: 0; border-radius: 15px; cursor: pointer;
+  flex: 1 1 0; min-width: 0; height: 56px; border: 0; border-radius: 15px; cursor: pointer;
   font-family: inherit; background: rgba(255,255,255,.02);
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;

@@ -1,19 +1,21 @@
-import { json } from '../lib/shared.mjs';
-import { listScores } from '../lib/store.mjs';
+'use strict';
 
-export default async (req) => {
-  if (req.method === 'OPTIONS') {
-    return json(204, {});
+var shared = require('../lib/shared');
+var store = require('../lib/store');
+
+exports.handler = async function (event) {
+  if (event.httpMethod === 'OPTIONS') {
+    return shared.json(204, {});
   }
-  if (req.method !== 'GET') {
-    return json(405, { error: 'Method not allowed' });
+  if (event.httpMethod !== 'GET') {
+    return shared.json(405, { error: 'Method not allowed' });
   }
 
   try {
-    const scores = await listScores();
-    return json(200, { scores });
+    var rows = await store.listScores(event);
+    return shared.json(200, { scores: rows });
   } catch (err) {
-    return json(err.statusCode || 500, {
+    return shared.json(err.statusCode || 500, {
       error: err.message || 'Failed to load leaderboard.',
       detail: err.detail
     });

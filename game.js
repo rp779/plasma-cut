@@ -147,13 +147,15 @@
     }
   }
 
-  function loadLeaderboard() {
-    el.scoreboard.innerHTML = '';
-    var status = document.createElement('p');
-    status.className = 'scoreboard-status';
-    status.id = 'scoreboard-status';
-    status.textContent = 'LOADING…';
-    el.scoreboard.appendChild(status);
+  function loadLeaderboard(attempt) {
+    var tryNum = attempt || 0;
+    if (tryNum === 0) {
+      el.scoreboard.innerHTML = '';
+      var status = document.createElement('p');
+      status.className = 'scoreboard-status';
+      status.textContent = 'LOADING…';
+      el.scoreboard.appendChild(status);
+    }
 
     fetch(apiUrl('leaderboard'))
       .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
@@ -162,6 +164,10 @@
         renderScoreboard(result.data.scores || []);
       })
       .catch(function () {
+        if (tryNum < 2) {
+          setTimeout(function () { loadLeaderboard(tryNum + 1); }, 800 * (tryNum + 1));
+          return;
+        }
         el.scoreboard.innerHTML = '';
         var err = document.createElement('p');
         err.className = 'scoreboard-status';

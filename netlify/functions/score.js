@@ -24,7 +24,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    var result = await store.upsertScore(parsed.nickname, parsed.score, parsed.level, event);
+    var result = await store.upsertScore(parsed.nickname, parsed.score, parsed.level);
     return shared.json(200, {
       ok: true,
       updated: result.updated,

@@ -2,8 +2,8 @@
 
 A JezzBall-style containment game. Portrait, touch-first, no frontend dependencies
 and no build step for the game itself — open `index.html` (via a local server) and
-it runs. The public leaderboard is served by Netlify Functions (Netlify Blobs by
-default, or Supabase when `SUPABASE_*` env vars are set).
+it runs. The public leaderboard is served by Netlify Functions — Supabase when
+configured, otherwise GitHub-backed `data/scores.json`.
 
 ```
 index.html              screens & HUD markup
@@ -35,22 +35,22 @@ Desktop testing shortcuts: `H` / `V` flip the cut axis, `Esc` pauses.
 Live site: https://plasma-cut.netlify.app  
 Repo: https://github.com/rp779/plasma-cut
 
-Scores work out of the box on Netlify via **Netlify Blobs**. Optionally point the
-same API at **Supabase** (recommended before iOS auth) by setting env vars.
-
 ### Netlify
 
 - Publish directory: `.` (from `netlify.toml`)
 - Functions: `netlify/functions`
-- Optional env vars (switch storage to Supabase):
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
+- Env vars (pick one storage backend):
 
-### Supabase (optional)
+**GitHub storage (default for Phase 1)**
+- `GITHUB_TOKEN` — classic PAT or fine-grained token with Contents read/write on this repo
+- `GITHUB_REPO` — `rp779/plasma-cut` (optional override)
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql).
-3. Set the two env vars above on the Netlify site and redeploy.
+**Supabase (recommended before iOS auth)**
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor first.
+
+When `SUPABASE_*` is set, GitHub storage is unused.
 
 ### Smoke test
 

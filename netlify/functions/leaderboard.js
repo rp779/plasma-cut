@@ -12,7 +12,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    var rows = await store.listScores(event);
+    var rows = await store.listScores();
     return shared.json(200, { scores: rows });
   } catch (err) {
     return shared.json(err.statusCode || 500, {

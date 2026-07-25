@@ -2,17 +2,18 @@
 
 var shared = require('./shared');
 var RATE_LIMIT_MS = 5000;
+var SCORES_PATH = 'data/scores.json';
 
-async function listScores(event) {
+async function listScores() {
   var cfg = shared.supabaseConfig();
   if (cfg) return listSupabase(cfg);
-  return listBlobs(event);
+  return listGithub();
 }
 
-async function upsertScore(nickname, score, level, event) {
+async function upsertScore(nickname, score, level) {
   var cfg = shared.supabaseConfig();
   if (cfg) return upsertSupabase(cfg, nickname, score, level);
-  return upsertBlobs(nickname, score, level, event);
+  return upsertGithub(nickname, score, level);
 }
 
 async function listSupabase(cfg) {
@@ -77,105 +78,137 @@ async function upsertSupabase(cfg, nickname, score, level) {
   return { updated: true, entry: Array.isArray(saved) ? saved[0] : saved };
 }
 
-async function getBlobStore(event) {
-  var blobs = await import('@netlify/blobs');
-  if (typeof blobs.connectLambda === 'function' && event) {
-    blobs.connectLambda(event);
-  }
-  return blobs.getStore('plasma-cut-scores');
+function githubConfig() {
+  var token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  var repo = process.env.GITHUB_REPO || 'rp779/plasma-cut';
+  if (!token) return null;
+  return { token: token, repo: repo };
 }
 
-function nickKey(nickname) {
-  return 'nick:' + nickname.toLowerCase();
-}
-
-async function loadBoard(store) {
-  var byNick = {};
-
-  var board = await store.get('board', { type: 'json' });
-  if (Array.isArray(board)) {
-    for (var i = 0; i < board.length; i++) {
-      if (board[i] && board[i].nickname) byNick[board[i].nickname.toLowerCase()] = board[i];
-    }
-  }
-
-  var listed = await store.list();
-  var blobs = listed && listed.blobs ? listed.blobs : [];
-  for (var j = 0; j < blobs.length; j++) {
-    var key = blobs[j].key;
-    if (key.indexOf('nick:') !== 0) continue;
-    var row = await store.get(key, { type: 'json' });
-    if (!row || typeof row.score !== 'number' || !row.nickname) continue;
-    var nk = row.nickname.toLowerCase();
-    if (!byNick[nk] || byNick[nk].score < row.score) byNick[nk] = row;
-  }
-
-  var legacy = await store.get('all', { type: 'json' });
-  if (legacy && legacy.scores) {
-    var legacyKeys = Object.keys(legacy.scores);
-    for (var k = 0; k < legacyKeys.length; k++) {
-      var entry = legacy.scores[legacyKeys[k]];
-      if (!entry || typeof entry.score !== 'number' || !entry.nickname) continue;
-      var ln = entry.nickname.toLowerCase();
-      if (!byNick[ln] || byNick[ln].score < entry.score) byNick[ln] = entry;
-    }
-  }
-
-  return Object.keys(byNick).map(function (n) { return byNick[n]; });
-}
-
-async function listBlobs(event) {
-  var store = await getBlobStore(event);
-  var rows = await loadBoard(store);
-  rows.sort(function (a, b) {
-    return b.score - a.score || String(a.nickname).localeCompare(String(b.nickname));
-  });
-  return rows.slice(0, 50);
-}
-
-async function upsertBlobs(nickname, score, level, event) {
-  var store = await getBlobStore(event);
-  var key = nickKey(nickname);
-  var existing = await store.get(key, { type: 'json' });
-
-  if (existing) {
-    var updatedAt = Date.parse(existing.updated_at);
-    if (!Number.isNaN(updatedAt) && Date.now() - updatedAt < RATE_LIMIT_MS) {
-      var rateErr = new Error('Slow down — try again in a few seconds.');
-      rateErr.statusCode = 429;
-      throw rateErr;
-    }
-    if (existing.score >= score) {
-      return { updated: false, entry: existing };
-    }
-  }
-
-  var entry = {
-    nickname: nickname,
-    score: score,
-    level: level,
-    updated_at: new Date().toISOString()
+function githubHeaders(token) {
+  return {
+    Authorization: 'Bearer ' + token,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'plasma-cut-leaderboard'
   };
+}
 
-  await store.setJSON(key, entry);
+async function readGithubFile(cfg) {
+  var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + SCORES_PATH;
+  var res = await fetch(url, { headers: githubHeaders(cfg.token) });
+  if (res.status === 404) {
+    return { scores: [], sha: null };
+  }
+  if (!res.ok) {
+    var err = new Error('Failed to load leaderboard.');
+    err.statusCode = 502;
+    err.detail = await res.text();
+    throw err;
+  }
+  var data = await res.json();
+  var decoded = Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf8');
+  var parsed = JSON.parse(decoded);
+  var scores = Array.isArray(parsed.scores) ? parsed.scores : [];
+  return { scores: scores, sha: data.sha };
+}
 
-  var rows = await loadBoard(store);
-  var replaced = false;
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i].nickname.toLowerCase() === nickname.toLowerCase()) {
-      if (rows[i].score <= score) rows[i] = entry;
-      replaced = true;
-      break;
+async function writeGithubFile(cfg, scores, sha) {
+  var url = 'https://api.github.com/repos/' + cfg.repo + '/contents/' + SCORES_PATH;
+  var body = {
+    message: 'Update public high scores',
+    content: Buffer.from(JSON.stringify({ scores: scores }, null, 2) + '\n', 'utf8').toString('base64')
+  };
+  if (sha) body.sha = sha;
+
+  var res = await fetch(url, {
+    method: 'PUT',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, githubHeaders(cfg.token)),
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    var err = new Error('Failed to save score.');
+    err.statusCode = res.status === 409 ? 409 : 502;
+    err.detail = await res.text();
+    throw err;
+  }
+}
+
+function sortScores(scores) {
+  return scores.slice().sort(function (a, b) {
+    return b.score - a.score || String(a.nickname).localeCompare(String(b.nickname));
+  }).slice(0, 50);
+}
+
+async function listGithub() {
+  var cfg = githubConfig();
+  if (!cfg) {
+    var err = new Error('Leaderboard is not configured.');
+    err.statusCode = 500;
+    throw err;
+  }
+  var file = await readGithubFile(cfg);
+  return sortScores(file.scores);
+}
+
+async function upsertGithub(nickname, score, level) {
+  var cfg = githubConfig();
+  if (!cfg) {
+    var err = new Error('Leaderboard is not configured.');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  var attempts = 0;
+  while (attempts < 3) {
+    attempts++;
+    var file = await readGithubFile(cfg);
+    var scores = file.scores.slice();
+    var idx = -1;
+    for (var i = 0; i < scores.length; i++) {
+      if (scores[i].nickname.toLowerCase() === nickname.toLowerCase()) {
+        idx = i;
+        break;
+      }
+    }
+
+    var existing = idx >= 0 ? scores[idx] : null;
+    if (existing) {
+      var updatedAt = Date.parse(existing.updated_at);
+      if (!Number.isNaN(updatedAt) && Date.now() - updatedAt < RATE_LIMIT_MS) {
+        var rateErr = new Error('Slow down — try again in a few seconds.');
+        rateErr.statusCode = 429;
+        throw rateErr;
+      }
+      if (existing.score >= score) {
+        return { updated: false, entry: existing };
+      }
+    }
+
+    var entry = {
+      nickname: nickname,
+      score: score,
+      level: level,
+      updated_at: new Date().toISOString()
+    };
+
+    if (idx >= 0) scores[idx] = entry;
+    else scores.push(entry);
+    scores = sortScores(scores);
+
+    try {
+      await writeGithubFile(cfg, scores, file.sha);
+      return { updated: true, entry: entry };
+    } catch (writeErr) {
+      if (writeErr.statusCode === 409 && attempts < 3) continue;
+      throw writeErr;
     }
   }
-  if (!replaced) rows.push(entry);
 
-  rows.sort(function (a, b) {
-    return b.score - a.score || String(a.nickname).localeCompare(String(b.nickname));
-  });
-  await store.setJSON('board', rows.slice(0, 50));
-
-  return { updated: true, entry: entry };
+  var fail = new Error('Failed to save score.');
+  fail.statusCode = 502;
+  throw fail;
 }
 
 module.exports = {

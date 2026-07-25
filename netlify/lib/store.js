@@ -90,7 +90,7 @@ async function getBlobStore(event) {
 }
 
 async function readBlobMap(store) {
-  var data = await store.get('all', { type: 'json', consistency: 'strong' });
+  var data = await store.get('all', { type: 'json' });
   return data && data.scores ? data.scores : {};
 }
 

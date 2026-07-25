@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Plasma Cut</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#04060c" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="app">
+
+  <div class="bg-wash"></div>
+  <div class="bg-grid"></div>
+
+  <!-- ══ TITLE ══ -->
+  <section class="screen" id="screen-title">
+    <div class="orb-deco orb-deco--a"></div>
+    <div class="orb-deco orb-deco--b"></div>
+    <div class="title-mark">
+      <div class="eyebrow">CONTAIN · DIVIDE · CLEAR</div>
+      <div class="logo-1">PLASMA</div>
+      <div class="logo-2-row">
+        <i class="rule rule--l"></i>
+        <div class="logo-2">CUT</div>
+        <i class="rule rule--r"></i>
+      </div>
+    </div>
+    <div class="title-actions">
+      <button class="btn btn--primary" data-act="play">PLAY</button>
+      <div class="row-2">
+        <button class="btn btn--ghost" data-act="levels">LEVELS</button>
+        <div class="stat-box">
+          <div class="stat-label">BEST</div>
+          <div class="stat-value" data-bind="best">0</div>
+        </div>
+      </div>
+      <button class="btn btn--ghost btn--full" data-act="scores">SCORES</button>
+      <p class="hint">TAP THE FIELD TO GROW A WALL. TRAP THE ORBS.</p>
+    </div>
+  </section>
+
+  <!-- ══ LEVEL SELECT ══ -->
+  <section class="screen" id="screen-levels" hidden>
+    <header class="sub-head">
+      <button class="icon-btn" data-act="title">‹</button>
+      <h1>SELECT LEVEL</h1>
+    </header>
+    <div class="level-grid" id="level-grid"></div>
+    <p class="hint hint--foot">MORE ORBS · FASTER PLASMA · BIGGER TARGET</p>
+  </section>
+
+  <!-- ══ SCORES ══ -->
+  <section class="screen" id="screen-scores" hidden>
+    <header class="sub-head">
+      <button class="icon-btn" data-act="title">‹</button>
+      <h1>HIGH SCORES</h1>
+    </header>
+    <div class="scoreboard" id="scoreboard">
+      <p class="scoreboard-status" id="scoreboard-status">LOADING…</p>
+    </div>
+    <p class="hint hint--foot">PUBLIC · BEST SCORE PER NICKNAME</p>
+  </section>
+
+  <!-- ══ GAME ══ -->
+  <section class="screen screen--game" id="screen-game" hidden>
+
+    <div class="hud">
+      <div class="hud-row">
+        <div class="pips" id="pips"></div>
+        <div class="chip">LV <span data-bind="level">01</span></div>
+        <div class="pct"><b data-bind="pct">0%</b><span>/ <span data-bind="target">71%</span></span></div>
+        <div class="spacer"></div>
+        <div class="readout">
+          <div class="stat-label">SCORE</div>
+          <div class="readout-value" data-bind="score">0</div>
+        </div>
+        <div class="readout readout--time">
+          <div class="stat-label">TIME</div>
+          <div class="readout-value" data-bind="time">0:00</div>
+        </div>
+        <button class="icon-btn icon-btn--pause" data-act="pause"><i></i><i></i></button>
+      </div>
+      <div class="bar">
+        <div class="bar-fill" id="bar-fill"></div>
+        <div class="bar-target" id="bar-target"></div>
+      </div>
+    </div>
+
+    <div class="field-wrap" id="field-wrap">
+      <canvas id="field"></canvas>
+    </div>
+
+    <div class="axis-dock">
+      <div class="axis-label">CUT DIRECTION</div>
+      <div class="seg">
+        <button class="seg-btn is-on" data-axis="h">
+          <span class="glyph glyph--h"><i></i><i></i></span>
+          <span class="seg-text">HORIZONTAL</span>
+        </button>
+        <button class="seg-btn" data-axis="v">
+          <span class="glyph glyph--v"><i></i><i></i></span>
+          <span class="seg-text">VERTICAL</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- overlays -->
+    <div class="overlay" id="overlay-paused" hidden>
+      <div class="over-title">PAUSED</div>
+      <div class="over-actions">
+        <button class="btn btn--primary" data-act="resume">RESUME</button>
+        <button class="btn btn--ghost" data-act="restart">RESTART</button>
+        <button class="btn btn--quiet" data-act="quit">QUIT</button>
+      </div>
+    </div>
+
+    <div class="overlay overlay--clear" id="overlay-clear" hidden>
+      <div class="over-eyebrow">FIELD CONTAINED</div>
+      <div class="over-title over-title--clear">CLEAR</div>
+      <div class="over-stats">
+        <div class="stat-box"><div class="stat-label">CAPTURED</div><div class="stat-value" data-bind="pct">0%</div></div>
+        <div class="stat-box"><div class="stat-label">TIME</div><div class="stat-value" data-bind="time">0:00</div></div>
+        <div class="stat-box stat-box--accent"><div class="stat-label">SCORE</div><div class="stat-value" data-bind="score">0</div></div>
+      </div>
+      <div class="submit-panel" id="submit-panel">
+        <label class="submit-label" for="nickname-input">NICKNAME</label>
+        <input id="nickname-input" class="nick-input" type="text" maxlength="16" autocomplete="nickname" placeholder="YOUR NAME" />
+        <p class="submit-msg" id="submit-msg" hidden></p>
+        <button class="btn btn--primary" data-act="submit-score" id="btn-submit-score">SUBMIT SCORE</button>
+      </div>
+      <div class="over-actions">
+        <button class="btn btn--ghost btn--full" data-act="next">NEXT LEVEL</button>
+        <button class="btn btn--quiet" data-act="quit">MENU</button>
+      </div>
+    </div>
+
+    <div class="overlay overlay--dead" id="overlay-dead" hidden>
+      <div class="over-eyebrow over-eyebrow--warn">CONTAINMENT FAILED</div>
+      <div class="over-title over-title--dead">GAME OVER</div>
+      <div class="over-stats">
+        <div class="stat-box"><div class="stat-label">REACHED</div><div class="stat-value" data-bind="pct">0%</div></div>
+        <div class="stat-box stat-box--warn"><div class="stat-label">SCORE</div><div class="stat-value" data-bind="score">0</div></div>
+      </div>
+      <div class="over-actions">
+        <button class="btn btn--danger" data-act="restart">TRY AGAIN</button>
+        <button class="btn btn--quiet" data-act="quit">MENU</button>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>

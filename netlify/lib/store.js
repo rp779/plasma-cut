@@ -3,16 +3,16 @@
 var shared = require('./shared');
 var RATE_LIMIT_MS = 5000;
 
-async function listScores() {
+async function listScores(event) {
   var cfg = shared.supabaseConfig();
   if (cfg) return listSupabase(cfg);
-  return listBlobs();
+  return listBlobs(event);
 }
 
-async function upsertScore(nickname, score, level) {
+async function upsertScore(nickname, score, level, event) {
   var cfg = shared.supabaseConfig();
   if (cfg) return upsertSupabase(cfg, nickname, score, level);
-  return upsertBlobs(nickname, score, level);
+  return upsertBlobs(nickname, score, level, event);
 }
 
 async function listSupabase(cfg) {
@@ -81,28 +81,31 @@ async function upsertSupabase(cfg, nickname, score, level) {
   return { updated: true, entry: Array.isArray(saved) ? saved[0] : saved };
 }
 
-async function getBlobStore() {
+async function getBlobStore(event) {
   var blobs = await import('@netlify/blobs');
+  if (typeof blobs.connectLambda === 'function' && event) {
+    blobs.connectLambda(event);
+  }
   return blobs.getStore('plasma-cut-scores');
 }
 
-async function readBlobMap() {
-  var store = await getBlobStore();
+async function readBlobMap(event) {
+  var store = await getBlobStore(event);
   var data = await store.get('all', { type: 'json' });
   return data && data.scores ? data.scores : {};
 }
 
-async function listBlobs() {
-  var map = await readBlobMap();
+async function listBlobs(event) {
+  var map = await readBlobMap(event);
   return Object.keys(map)
     .map(function (k) { return map[k]; })
     .sort(function (a, b) { return b.score - a.score || a.nickname.localeCompare(b.nickname); })
     .slice(0, 50);
 }
 
-async function upsertBlobs(nickname, score, level) {
-  var store = await getBlobStore();
-  var map = await readBlobMap();
+async function upsertBlobs(nickname, score, level, event) {
+  var store = await getBlobStore(event);
+  var map = await readBlobMap(event);
   var key = nickname.toLowerCase();
   var existing = map[key];
 

@@ -89,14 +89,14 @@ async function getBlobStore(event) {
   return blobs.getStore('plasma-cut-scores');
 }
 
-async function readBlobMap(event) {
-  var store = await getBlobStore(event);
-  var data = await store.get('all', { type: 'json' });
+async function readBlobMap(store) {
+  var data = await store.get('all', { type: 'json', consistency: 'strong' });
   return data && data.scores ? data.scores : {};
 }
 
 async function listBlobs(event) {
-  var map = await readBlobMap(event);
+  var store = await getBlobStore(event);
+  var map = await readBlobMap(store);
   return Object.keys(map)
     .map(function (k) { return map[k]; })
     .sort(function (a, b) { return b.score - a.score || a.nickname.localeCompare(b.nickname); })
@@ -105,7 +105,7 @@ async function listBlobs(event) {
 
 async function upsertBlobs(nickname, score, level, event) {
   var store = await getBlobStore(event);
-  var map = await readBlobMap(event);
+  var map = await readBlobMap(store);
   var key = nickname.toLowerCase();
   var existing = map[key];
 

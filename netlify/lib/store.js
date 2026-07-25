@@ -93,27 +93,46 @@ function nickKey(nickname) {
   return 'nick:' + nickname.toLowerCase();
 }
 
-async function listBlobs(event) {
-  var store = await getBlobStore(event);
-  var listed = await store.list();
-  var keys = (listed && listed.blobs ? listed.blobs : [])
-    .map(function (b) { return b.key; })
-    .filter(function (k) { return k.indexOf('nick:') === 0; });
+async function collectKeys(store) {
+  var keySet = {};
+  var index = await store.get('index', { type: 'json' });
+  if (Array.isArray(index)) {
+    for (var i = 0; i < index.length; i++) keySet[index[i]] = true;
+  }
 
-  // Migrate legacy single-document store if present
-  if (!keys.length) {
-    var legacy = await store.get('all', { type: 'json' });
-    if (legacy && legacy.scores) {
-      var legacyKeys = Object.keys(legacy.scores);
-      for (var i = 0; i < legacyKeys.length; i++) {
-        var entry = legacy.scores[legacyKeys[i]];
-        if (entry && entry.nickname) {
-          await store.setJSON(nickKey(entry.nickname), entry);
-          keys.push(nickKey(entry.nickname));
-        }
+  var listed = await store.list();
+  var blobs = listed && listed.blobs ? listed.blobs : [];
+  for (var j = 0; j < blobs.length; j++) {
+    if (blobs[j].key.indexOf('nick:') === 0) keySet[blobs[j].key] = true;
+  }
+
+  // Legacy single-document migration
+  var legacy = await store.get('all', { type: 'json' });
+  if (legacy && legacy.scores) {
+    var legacyKeys = Object.keys(legacy.scores);
+    for (var k = 0; k < legacyKeys.length; k++) {
+      var entry = legacy.scores[legacyKeys[k]];
+      if (entry && entry.nickname) {
+        var lk = nickKey(entry.nickname);
+        var existing = await store.get(lk, { type: 'json' });
+        if (!existing) await store.setJSON(lk, entry);
+        keySet[lk] = true;
       }
     }
   }
+
+  return Object.keys(keySet);
+}
+
+async function writeIndex(store, keys) {
+  var unique = keys.slice().sort();
+  await store.setJSON('index', unique);
+}
+
+async function listBlobs(event) {
+  var store = await getBlobStore(event);
+  var keys = await collectKeys(store);
+  if (keys.length) await writeIndex(store, keys);
 
   var rows = [];
   for (var j = 0; j < keys.length; j++) {
@@ -151,6 +170,11 @@ async function upsertBlobs(nickname, score, level, event) {
     updated_at: new Date().toISOString()
   };
   await store.setJSON(key, entry);
+
+  var keys = await collectKeys(store);
+  if (keys.indexOf(key) === -1) keys.push(key);
+  await writeIndex(store, keys);
+
   return { updated: true, entry: entry };
 }
 
